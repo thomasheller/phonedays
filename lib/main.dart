@@ -30,29 +30,48 @@ class Entry implements Comparable<Entry> {
 }
 
 class _MyAppState extends State<MyApp> {
-  Iterable<CallLogEntry> _callLogEntries = [];
+  Iterable<CallLogEntry> callLogEntries = [];
 
   @override
   Widget build(BuildContext context) {
     var mono = TextStyle(fontFamily: 'monospace');
     var children = <Widget>[];
 
-    Map peopleDays = new HashMap<String, Set<String>>();
+    Map peopleDays = HashMap<String, Set<String>>();
 
-    _callLogEntries.forEach((entry) {
+    print('Found ${callLogEntries.length} call log entries');
+
+    callLogEntries.forEach((entry) {
       if(entry.name == null || entry.name.trim().length == 0) {
         return;
       }
 
-      peopleDays.putIfAbsent(entry.name, () => new LinkedHashSet<String>());
-      String day = DateFormat('YYYYMMDD').format(DateTime.fromMillisecondsSinceEpoch(entry.timestamp));
+      DateTime dt = DateTime.fromMillisecondsSinceEpoch(entry.timestamp);
+      String ts = DateFormat('yyyy-MM-dd HH:mm:ss').format(dt);
+
+      if(entry.duration < 60) { // duration in seconds
+        // Don't count calls shorter than one minute.
+        print('Call skipped because shorter than one minute (name: "${entry.name}" ts: ${ts}');
+        return;
+      }
+
+      peopleDays.putIfAbsent(entry.name, () => LinkedHashSet<String>());
+
+      if(dt.hour <= 3) { // 3am
+        // Calls before 4am count towards the previous day.
+        print('Call before 4am will be moved to previous day (name: "${entry.name}" ts: ${ts}');
+        dt = dt.subtract(Duration(days: 1));
+      }
+
+      String day = DateFormat('yyyyMMdd').format(dt);
+
       peopleDays[entry.name].add(day);
     });
 
-    List result = new List<Entry>();
+    List result = List<Entry>();
 
     peopleDays.forEach((name, dates) {
-      Entry entry = new Entry(name: name, days: dates.length);
+      Entry entry = Entry(name: name, days: dates.length);
       result.add(entry);
     });
 
@@ -85,7 +104,7 @@ class _MyAppState extends State<MyApp> {
                     onPressed: () async {
                       var result = await CallLog.query();
                       setState(() {
-                        _callLogEntries = result;
+                        callLogEntries = result;
                       });
                     },
                     child: Text("Get stats"),
